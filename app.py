@@ -3,11 +3,13 @@ import pandas as pd
 from datetime import datetime
 import os
 
-# CONFIGURATION DU LIEN GOOGLE (FEUILLE DE CALCUL)
+# --- LIEN GOOGLE SHEETS ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSe5Y5nVHoX9XmZyAjE_Lf2u0hkWbGldKc-KdHmFPvZSkr2_vp8VzJWHCxtXiOfKPUMjcJzjnA2hK-m/pub?output=csv"
 
-st.set_page_config(page_title="Nails App", layout="centered")
+# --- CONFIGURATION PAGE ---
+st.set_page_config(page_title="Gestion Salon Nails", layout="centered")
 
+# --- CHARGEMENT DES ACCÈS ---
 def get_users_data():
     try:
         user_df = pd.read_csv(SHEET_URL)
@@ -24,6 +26,7 @@ def get_users_data():
     except:
         return {"hoang": {"pwd": "1963", "pct": 0.5}}
 
+# --- SYSTÈME DE CONNEXION ---
 if "auth" not in st.session_state:
     st.title("🔐 Đăng nhập")
     users = get_users_data()
@@ -36,32 +39,31 @@ if "auth" not in st.session_state:
             st.rerun()
         else:
             st.error("Sai tên đăng nhập hoặc mật khẩu.")
+
+# --- INTERFACE DE SAISIE ---
 else:
     user = st.session_state["auth"]
     pct = st.session_state["pct"]
     st.title(f"💅 Chào {user.capitalize()}")
-    st.info(f"Mức hưởng của bạn là: {int(pct*100)}%")
+    st.info(f"Mức hưởng: {int(pct*100)}%")
     
     DB_FILE = f"data_{user}.csv"
-    if os.path.exists(DB_FILE):
-        df = pd.read_csv(DB_FILE)
-    else:
-        df = pd.DataFrame(columns=['Date', 'CA_Brut', 'Part'])
+    df = pd.read_csv(DB_FILE) if os.path.exists(DB_FILE) else pd.DataFrame(columns=['Date', 'CA_Brut', 'Part'])
 
-    with st.expander("➕ Nhập số liệu mới", expanded=True):
+    with st.form("my_form", clear_on_submit=True):
         dt = st.date_input("Ngày :", datetime.now())
-        mt = st.number_input("Số tiền khách trả (€) :", min_value=0.0, format="%.2f")
-        if st.button("LƯU DỮ LIỆU", use_container_width=True):
-            if mt > 0:
-                new_row = pd.DataFrame([{'Date': str(dt), 'CA_Brut': mt, 'Part': mt * pct}])
-                df = pd.concat([df, new_row], ignore_index=True)
-                df.to_csv(DB_FILE, index=False)
-                st.success(f"Đã lưu! Phần của bạn: {mt * pct:.2f} €")
-                st.rerun()
+        mt = st.number_input("Số tiền (€) :", min_value=0.0, step=1.0)
+        submitted = st.form_submit_button("LƯU DỮ LIỆU", use_container_width=True)
+        if submitted and mt > 0:
+            new_row = pd.DataFrame([{'Date': str(dt), 'CA_Brut': mt, 'Part': mt * pct}])
+            df = pd.concat([df, new_row], ignore_index=True)
+            df.to_csv(DB_FILE, index=False)
+            st.success(f"Đã lưu thành công {mt * pct:.2f} €")
+            st.rerun()
 
     st.divider()
     total = df['Part'].sum() if not df.empty else 0
-    st.metric(label="TỔNG THU NHẬP HIỆN TẠI", value=f"{total:.2f} €")
+    st.metric(label="TỔNG THU NHẬP", value=f"{total:.2f} €")
     
     if st.button("Thoát"):
         del st.session_state["auth"]
