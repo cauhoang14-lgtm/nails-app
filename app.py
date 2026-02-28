@@ -1,99 +1,11 @@
 import streamlit as st
-import pandas as pd
-from datetime import datetime
-import os
 
-# --- CONFIGURATION ---
-# Lien vers votre fichier Google Sheets (ne pas modifier)
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSe5Y5nVHoX9XmZyAjE_Lf2u0hkWbGldKc-KdHmFPvZSkr2_vp8VzJWHCxtXiOfKPUMjcJzjnA2hK-m/pub?output=csv"
+st.title("Test Salon Nails")
+st.write("Bonjour Monseigneur Hoang !")
+st.success("Si vous voyez ce message, l'application fonctionne !")
 
-st.set_page_config(page_title="Gestion Salon Nails", layout="centered")
+u = st.text_input("Nom :")
+p = st.text_input("Code :", type="password")
 
-# --- FONCTION POUR RÉCUPÉRER LES EMPLOYÉS ---
-def get_users_data():
-    try:
-        user_df = pd.read_csv(SHEET_URL)
-        data = {}
-        for _, row in user_df.iterrows():
-            uid = str(row.iloc[0]).lower().strip()
-            pwd = str(row.iloc[1]).strip()
-            try:
-                # Gestion du pourcentage (ex: 50 ou 0.5)
-                val = float(str(row.iloc[2]).replace(',', '.'))
-                pct = val / 100 if val > 1 else val
-            except:
-                pct = 0.5
-            data[uid] = {"pwd": pwd, "pct": pct}
-        return data
-    except:
-        # En cas d'erreur de lecture, accès par défaut pour vous
-        return {"hoang": {"pwd": "1963", "pct": 0.5}}
-
-# --- LOGIQUE DE CONNEXION ---
-if "auth" not in st.session_state:
-    st.title("🔐 Đăng nhập")
-    users = get_users_data()
-    
-    u = st.text_input("Tên đăng nhập (Nom) :").lower().strip()
-    p = st.text_input("Mật khẩu (Code) :", type="password").strip()
-    
-    if st.button("Đăng nhập", use_container_width=True):
-        if u in users and users[u]["pwd"] == p:
-            # On enregistre les informations séparément pour éviter les erreurs
-            st.session_state["auth"] = u
-            st.session_state["pct"] = users[u]["pct"]
-            st.rerun()
-        else:
-            st.error("Sai tên đăng nhập hoặc mật khẩu.")
-
-# --- INTERFACE UNE FOIS CONNECTÉ ---
-else:
-    user = st.session_state["auth"]
-    pct = st.session_state["pct"]
-    
-    st.title(f"💅 Chào {user.capitalize()}")
-    st.write(f"Mức hưởng của bạn: **{int(pct*100)}%**")
-    
-    # Création d'un fichier de données séparé pour chaque utilisateur
-    DB_FILE = f"data_{user}.csv"
-    
-    if os.path.exists(DB_FILE):
-        df = pd.read_csv(DB_FILE)
-        df['Date'] = pd.to_datetime(df['Date'])
-    else:
-        df = pd.DataFrame(columns=['Date', 'CA_Brut', 'Part'])
-
-    # --- FORMULAIRE DE SAISIE ---
-    with st.container(border=True):
-        st.subheader("Nhập số liệu mới")
-        dt = st.date_input("Ngày (Date) :", datetime.now())
-        mt = st.number_input("Số tiền thu được (€) :", min_value=0.0, format="%.2f")
-        
-        if st.button("LƯU DỮ LIỆU", use_container_width=True):
-            if mt > 0:
-                # Calcul de la part de l'employé
-                ma_part = mt * pct
-                new_row = pd.DataFrame([{'Date': pd.to_datetime(dt), 'CA_Brut': mt, 'Part': ma_part}])
-                
-                df = pd.concat([df, new_row], ignore_index=True)
-                df.to_csv(DB_FILE, index=False)
-                
-                st.success(f"Đã lưu! Bạn nhận được {ma_part:.2f} €")
-                st.rerun()
-
-    st.divider()
-
-    # --- AFFICHAGE DES RÉSULTATS DU MOIS ---
-    m_now = datetime.now().strftime('%m-%Y')
-    if not df.empty:
-        # Filtrer pour ne voir que le mois en cours
-        df['MonthYear'] = df['Date'].dt.strftime('%m-%Y')
-        total_mois = df[df['MonthYear'] == m_now]['Part'].sum()
-    else:
-        total_mois = 0
-        
-    st.metric(label=f"Tổng thu nhập tháng {datetime.now().strftime('%m/%Y')}", value=f"{total_mois:.2f} €")
-    
-    if st.button("Déconnexion"):
-        del st.session_state["auth"]
-        st.rerun()
+if st.button("Valider"):
+    st.write(f"Bravo {u}, le système est prêt.")
