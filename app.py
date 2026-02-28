@@ -1,0 +1,73 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import os
+
+# CONFIGURATION AUTOMATIQUE AVEC VOTRE LIEN RÉCUPÉRÉ
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSe5Y5nVHoX9XmZyAjE_Lf2u0hkWbGldKc-KdHmFPvZSkr2_vp8VzJWHCxtXiOfKPUMjcJzjnA2hK-m/pub?output=csv"
+
+st.set_page_config(page_title="App Doanh Thu Hoang", layout="centered")
+
+def add_bg():
+    st.markdown(f"""<style>.stApp {{
+    background-image: linear-gradient(rgba(255,255,255,0.8), rgba(255,255,255,0.8)), 
+    url("https://images.unsplash.com/photo-1632345031435-8727f6897d53?auto=format&fit=crop&w=1200&q=80");
+    background-attachment: fixed; background-size: cover;}}
+    .stMetric {{ background-color: rgba(255, 255, 255, 0.6); border-radius: 10px; padding: 15px; }}
+    </style>""", unsafe_allow_html=True)
+add_bg()
+
+def get_users_data():
+    try:
+        user_df = pd.read_csv(SHEET_URL)
+        data = {}
+        for _, row in user_df.iterrows():
+            uid = str(row.iloc[0]).lower().strip()
+            pwd = str(row.iloc[1]).strip()
+            try:
+                val = float(str(row.iloc[2]).replace(',', '.'))
+                pct = val / 100 if val > 1 else val
+            except: pct = 0.5
+            data[uid] = {"pwd": pwd, "pct": pct}
+        return data
+    except: return {"hoang": {"pwd": "1963", "pct": 0.5}}
+
+if "auth" not in st.session_state:
+    st.title("🔐 Đăng nhập")
+    users = get_users_data()
+    u = st.text_input("Tên đăng nhập :").lower().strip()
+    p = st.text_input("Mật khẩu :", type="password").strip()
+    if st.button("Đăng nhập", use_container_width=True):
+        if u in users and users[u]["pwd"] == p:
+            st.session_state["auth"], st.session_state["pct"] = u, users[u]["pct"]
+            st.rerun()
+        else: st.error("Sai tên đăng nhập hoặc mật khẩu.")
+else:
+    user, pct = st.session_state["auth"], st.session_state["pct"]
+    st.title(f"💅 Doanh thu - {user.capitalize()}")
+    st.write(f"Mức hưởng: **{int(pct*100)}%**")
+    DB_FILE = f"data_{user}.csv"
+    df = pd.read_csv(DB_FILE) if os.path.exists(DB_FILE) else pd.DataFrame(columns=['Date','CA_Brut','Part'])
+    df['Date'] = pd.to_datetime(df['Date']) if not df.empty else df['Date']
+
+    with st.container(border=True):
+        st.subheader("Nhập số liệu mới")
+        dt = st.date_input("Ngày :", datetime.now())
+        mt = st.number_input("Số tiền (€) :", min_value=0.0, format="%.2f")
+        if st.button("LƯU DỮ LIỆU", use_container_width=True):
+            if mt > 0:
+                new = pd.DataFrame([{'Date': pd.to_datetime(dt), 'CA_Brut': mt, 'Part': mt * pct}])
+                df = pd.concat([df, new], ignore_index=True)
+                df.to_csv(DB_FILE, index=False)
+                st.success("Đã lưu!")
+                st.rerun()
+
+    st.divider()
+    m_now = datetime.now().strftime('%m-%Y')
+    total = df[df['Date'].dt.strftime('%m-%Y') == m_now]['Part'].sum() if not df.empty else 0
+    st.metric(label=f"Tổng thu nhập tháng {datetime.now().strftime('%m/%Y')}", value=f"{total:.2f} €")
+
+    with st.expander("📜 Lịch sử"):
+        if not df.empty:
+            for idx, row in df.sort_index(ascending=False).iterrows():
+                st.write(f"{row['Date'].strftime('%d/%m')} : {row['CA_Brut']}€ (Bạn nhận: {row['Part']:.2f}€)")
